@@ -17,6 +17,8 @@ public class ThreadCreate {
         // 创建线程方式2，创建Thread对象时，传入一个Runnable实列
         Thread createThreadMethod02 = new Thread(new CreateThreadMethod02());
         createThreadMethod02.start();
+
+        System.out.println("线程" + Thread.currentThread().getName());
     }
 }
 
@@ -31,7 +33,7 @@ class CreateThreadMethod01 extends Thread{
 
     @Override
     public void run(){
-        System.out.println("继承Thread类，创建的线程启动了!");
+        System.out.println("继承Thread类，创建的线程启动了！线程名称："+ Thread.currentThread().getName());
     }
 }
 
