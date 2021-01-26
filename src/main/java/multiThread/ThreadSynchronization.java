@@ -122,7 +122,7 @@ class AddThread2 extends Thread {
             /**
              * 使用Counter.lock实列作为锁，两个线程在执行各自的synchronized(Counter.lock){...}代码块时，必须先获得锁，才能进入代码块运行。
              * 执行结束后，会在synchronized语句块结束会自动释放锁。这样确保了保证了Counter.count不会同时被多个线程读写操作。
-             * 但是synchronized会降低程序的性能。因为synchronized代码块无法并发执行，并且每次加锁和解锁也需要时间。
+             * 但是synchronized会降低程序的性能。因为synchronized代码块无法并发执行， 并且每次加锁和解锁也需要时间。
              */
             synchronized (Counter2.lock){  // 要锁住的是同一个对象，不然不能同步
                 Counter.count += 1;
