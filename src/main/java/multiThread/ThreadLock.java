@@ -2,9 +2,9 @@ package multiThread;
 
 import org.junit.Test;
 
+import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.*;
 
 /**
  * @ClassName: ThreadLock
@@ -43,6 +43,88 @@ public class ThreadLock {
         decThread.join();
 
         System.out.println("count:" + counter.count);
+        System.out.println("end...");
+    }
+
+    /***
+     * @Description: condition 测试
+     * @Author: gx
+     * @Date: 2021/1/27 15:59
+     * @Param: []
+     * @Return: void
+     **/
+    @Test
+    public void conditionTest() throws InterruptedException {
+
+        /**
+         * Condition 总结：
+         * 1，Condition可以替代wait和notify；
+         * 2，Condition对象必须从Lock对象获取。
+         */
+        TaskQueue2 taskQueue = new TaskQueue2();
+        List<Thread> threadList = new ArrayList<>();
+
+        for(int i=0; i<5; i++){
+            Thread thread = new Thread(() -> {
+                try {
+                    System.out.println(Thread.currentThread().getName() + "--" + taskQueue.getTask());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
+            threadList.add(thread);
+        }
+
+        Thread addTaskThread = new Thread(() -> {
+            for(int i=0; i<5; i++){
+                taskQueue.addTask("task" + i);
+            }
+        });
+        addTaskThread.start();
+
+        addTaskThread.join();
+
+        Thread.sleep(1000);
+
+        for(Thread thread : threadList){
+            thread.interrupt();
+        }
+
+        System.out.println("end...");
+    }
+
+    /***
+     * @Description: 读写锁测试
+     * @Author: gx
+     * @Date: 2021/1/27 18:07
+     **/
+    @Test
+    public void readWriteLockTest() throws InterruptedException {
+        /***
+         * 读写锁总结：
+         * 1，ReadWriteLock可以提高读取效率；
+         * 2，ReadWriteLock只允许一个线程写入；
+         * 3，ReadWriteLock允许多个线程在没有写入时同时读取；
+         * 4，ReadWriteLock适合读多写少的场景。
+         **/
+        Counter6 counter = new Counter6();
+        List<Thread> threadList = new ArrayList<>();
+        for(int i=0; i<10; i++){
+            Thread thread = new Thread(() -> counter.add());
+            thread.start();
+            threadList.add(thread);
+        }
+        for(int i=0; i<1000; i++){
+            Thread thread = new Thread(() -> {
+                System.out.println(counter.get());
+            });
+            thread.start();
+            threadList.add(thread);
+        }
+        for (Thread thread : threadList){
+            thread.join();
+        }
         System.out.println("end...");
     }
 }
@@ -96,6 +178,62 @@ class Counter5{
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
+            lock.unlock();
+        }
+    }
+}
+
+class Counter6 {
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock rLock = rwLock.readLock();
+    private final Lock wLock = rwLock.writeLock();
+    public int count = 0;
+
+    public void add(){
+        wLock.lock(); // 加写锁
+        try {
+            this.count += 1;
+        } finally {   // 确保无论如何都会正确释放锁
+            wLock.unlock(); // 释放写锁
+        }
+    }
+
+    public int get(){
+        rLock.lock();   // 加读锁
+        try {
+            return this.count;
+        } finally { // 确保无论如何都会正确释放锁
+            rLock.unlock();  // 释放读锁
+        }
+    }
+}
+
+class TaskQueue2{
+    private final Lock lock = new ReentrantLock();
+    // Condition对象必须从Lock对象获取。
+    private final Condition condition = lock.newCondition();
+    private Queue<String> queue = new LinkedList<>();
+
+    public void addTask(String task){
+        lock.lock();
+        try {
+            this.queue.add(task);
+            // signalAll 相当于 synchronized 的 notifyAll方法，唤醒其他所有线程
+            this.condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getTask() throws InterruptedException {
+        lock.lock();
+        try {
+            while (this.queue.isEmpty()) {
+                // await 相当于 synchronized 的 wait 方法， 让线程等待
+                this.condition.await();
+            }
+            return this.queue.remove();
+        }  finally {
             lock.unlock();
         }
     }
