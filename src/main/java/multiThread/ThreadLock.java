@@ -127,6 +127,43 @@ public class ThreadLock {
         }
         System.out.println("end...");
     }
+
+    /***
+     * @Description: stampedLock 测试
+     * @Author: gx
+     * @Date: 2021/1/29 18:11
+     * @Param: []
+     * @Return: void
+     **/
+    @Test
+    public void stampedLockTest() throws InterruptedException {
+        /**
+         * stampedLock 总结：
+         * 1，StampedLock提供了乐观读锁，可取代ReadWriteLock以进一步提升并发性能；
+         * 2，StampedLock是不可重入锁。
+         */
+        Point point = new Point();
+        List<Thread> threadList = new ArrayList<>();
+        for(int i=0; i<10; i++){
+            double x = i + 0.1;
+            Thread thread = new Thread(() -> {
+                point.move(x, 10 + x);
+            });
+            thread.start();
+            threadList.add(thread);
+        }
+        for(int i=0; i<1000; i++){
+            Thread thread = new Thread(() -> {
+                System.out.println(point.distanceFromOrigin());
+            });
+            thread.start();
+            threadList.add(thread);
+        }
+        for (Thread thread : threadList){
+            thread.join();
+        }
+        System.out.println("end...");
+    }
 }
 
 class Counter5{
@@ -236,5 +273,49 @@ class TaskQueue2{
         }  finally {
             lock.unlock();
         }
+    }
+}
+
+class Point {
+    private final StampedLock stampedLock = new StampedLock();
+
+    private double x;
+    private double y;
+
+    public void move(double deltaX, double deltaY) {
+        long stamp = stampedLock.writeLock(); // 获取写锁
+        try {
+            x += deltaX;
+            y += deltaY;
+        } finally {
+            stampedLock.unlockWrite(stamp); // 释放写锁
+        }
+    }
+
+    public double distanceFromOrigin(){
+        long stamp = stampedLock.tryOptimisticRead(); // 获取一个乐观的读锁
+        // 注意下面两行不是原子操作
+        // 此时读取了（100,200）
+        double currentX = x;
+        // 可能这里被改成了（300,400）
+        double currentY = y;
+        // 最后读取的数据可能是（100,400）,错误
+
+        /**
+         * 和ReadWriteLock相比，写入的加锁是完全一样的，不同的是读取。注意到首先我们通过tryOptimisticRead()获取一个乐观读锁，
+         * 并返回版本号。接着进行读取，读取完成后，我们通过validate()去验证版本号，如果在读取过程中没有写入，版本号不变，验证成功，
+         * 我们就可以放心地继续后续操作。如果在读取过程中有写入，版本号会发生变化，验证将失败。在失败的时候，我们再通过获取悲观读锁再次读取。
+         * 由于写入的概率不高，程序在绝大部分情况下可以通过乐观读锁获取数据，极少数情况下使用悲观读锁获取数据。
+         */
+        if(!stampedLock.validate(stamp)){  // 检测乐观读锁后是否还有其他写锁发生
+            stamp = stampedLock.readLock();  // 获取一个悲观的读锁
+            try {
+                currentX = x;
+                currentY = y;
+            } finally {
+                stampedLock.unlockRead(stamp);  // 释放悲观的读锁
+            }
+        }
+        return Math.sqrt(currentX * currentX + currentY * currentY);
     }
 }
