@@ -3,9 +3,7 @@ package multiThread;
 import org.junit.Test;
 
 import java.util.*;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.*;
 
 /**
  * @Author: gx
@@ -17,10 +15,12 @@ public class ProducerAndConsumer {
     @Test
     public void test() throws InterruptedException {
         Company company = new Company();
+        List<Thread> threadList = new ArrayList<>();
         List<Thread> producerThreadList = new ArrayList<>();
         List<Thread> consumerThreadList = new ArrayList<>();
         int producerSum = 100;
         int consumerSum = 100;
+        int readSum = 10000;
 
         Long startTime = new Date().getTime();
 
@@ -35,31 +35,47 @@ public class ProducerAndConsumer {
                 }
             });
             thread.start();
-            producerThreadList.add(thread);
+            threadList.add(thread);
         }
 
         // 消费
         for(int i = 0; i < consumerSum; i++){
             Thread thread = new Thread(() -> {
                 try {
-                    System.out.println(company.consumer());
+                    System.out.println(Thread.currentThread().getName() + "消费了商品：" + company.consumer());
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             });
             thread.start();
-            consumerThreadList.add(thread);
+            threadList.add(thread);
+        }
+
+        // 获取库存
+        for(int i = 0; i < readSum; i++){
+            Thread thread = new Thread(() -> {
+                try {
+                    System.out.println(Thread.currentThread().getName() + "当前库存：" + company.getStock() + "个" );
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
+            threadList.add(thread);
         }
 
 //        Thread.sleep(2000);
 
         // 主线程等待所有线程结束
-        for(Thread thread : consumerThreadList){
+        for(Thread thread : threadList){
             thread.join();
         }
-        for(Thread thread : producerThreadList){
-            thread.join();
-        }
+//        for(Thread thread : consumerThreadList){
+//            thread.join();
+//        }
+//        for(Thread thread : producerThreadList){
+//            thread.join();
+//        }
 
         System.out.println("end...");
         System.out.println("耗时：" + (new Date().getTime() - startTime) + " ms");
@@ -73,20 +89,22 @@ class Company{
     Queue<String> warehouse = new LinkedList<>();
     // 仓库容量
     int warehouseSize = 10;
-    private final Lock lock = new ReentrantLock();
-    private final Condition condition = lock.newCondition();
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock rLock = rwLock.readLock();
+    private final Lock wLock = rwLock.writeLock();
+    private final Condition condition = wLock.newCondition();
 
     /**
      * 生产者
      * @param goods
      */
     public  void producer(String goods) throws InterruptedException {
-        System.out.println("生产商品材料准备...");
+        System.out.println(Thread.currentThread().getName() + "生产商品材料准备...");
         Thread.sleep(10);
-        lock.lock();
+        wLock.lock();
         try {
             while (warehouse.size() == warehouseSize){
-                System.out.println("仓库满了，等待消费...");
+                System.out.println(Thread.currentThread().getName() +"仓库满了，等待消费...");
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
@@ -94,10 +112,11 @@ class Company{
                 }
             }
             warehouse.add(goods);
+            System.out.println(Thread.currentThread().getName() + "生产了商品：" + goods);
             Thread.sleep(1);
             condition.signalAll();
         } finally {
-            lock.unlock();
+            wLock.unlock();
         }
     }
 
@@ -106,12 +125,12 @@ class Company{
      * @return
      */
     public  String consumer() throws InterruptedException {
-        System.out.println("销售商品售前检查...");
+        System.out.println(Thread.currentThread().getName() + "销售商品售前检查...");
         Thread.sleep(10);
-        lock.lock();
+        wLock.lock();
         try {
             while (warehouse.isEmpty()){
-                System.out.println("仓库没有货物了，需要等待生产...");
+                System.out.println(Thread.currentThread().getName() + "仓库没有货物了，需要等待生产...");
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
@@ -121,7 +140,24 @@ class Company{
             condition.signalAll();
             return warehouse.remove();
         } finally {
-            lock.unlock();
+            wLock.unlock();
+        }
+    }
+
+    /***
+     * @Description: 获取库存
+     * @Author: gx
+     * @Date: 2021/2/1 11:08
+     **/
+    public int getStock() throws InterruptedException {
+
+        rLock.lock();
+        try {
+            System.out.println(Thread.currentThread().getName() + "清理仓库库存...");
+            Thread.sleep(1);
+            return warehouse.size();
+        } finally {
+            rLock.unlock();
         }
     }
 }
