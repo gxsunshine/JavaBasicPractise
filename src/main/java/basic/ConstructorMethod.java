@@ -21,11 +21,12 @@ public class ConstructorMethod {
     @Test
     public void test(){
         /**
-         *  1，调用子类的无参方法时，会首先调用父类的无参构造方法，如果父类没有无参构造方法就会报错。
+         *  1，调用子类的构造方法时，会首先调用父类的无参构造方法，如果父类没有无参构造方法就会报错。
          *  2，可以使用super(..) 来指定特定的父类构造方法，也不会报错
          *  3，为了防止报错，最好的解决方法是在父类中加一个什么也不做的无参构造方法
          */
         Son son = new Son();
+        Son son1 = new Son(25);
     }
 }
 
@@ -33,9 +34,9 @@ class Parent{
 
     private String name;
 
-//    public Parent() {
-//        System.out.println("父类的无参构造方法被调用了！");
-//    }
+    public Parent() {
+        System.out.println("父类的无参构造方法被调用了！");
+    }
 
     public Parent(String name) {
         System.out.println("父类的有参构造方法被调用了！");
@@ -45,10 +46,14 @@ class Parent{
 
 class Son extends Parent{
 
-    private String age;
+    private int age;
 
     public Son() {
-        super("few");
         System.out.println("子类的无参构造方法被调用了！");
+    }
+
+    public Son(int age) {
+        System.out.println("子类的有参构造方法被调用了！");
+        this.age = age;
     }
 }
